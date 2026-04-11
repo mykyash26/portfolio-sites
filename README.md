@@ -1,105 +1,110 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Website</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
-      background: #f4f4f4;
-    }
-    header {
-      background: #333;
-      color: #fff;
-      padding: 1rem 0;
-      text-align: center;
-    }
-    nav {
-      display: flex;
-      justify-content: center;
-      background: #555;
-    }
-    nav a {
-      color: white;
-      padding: 14px 20px;
-      text-decoration: none;
-    }
-    nav a:hover {
-      background: #333;
-    }
-    .container {
-      padding: 20px;
-    }
-    .card {
-      background: white;
-      padding: 20px;
-      margin: 20px 0;
-      border-radius: 10px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    footer {
-      text-align: center;
-      padding: 1rem;
-      background: #333;
-      color: white;
-      margin-top: 20px;
-    }
-    button {
-      padding: 10px 15px;
-      border: none;
-      background: #333;
-      color: white;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #555;
-    }
-  </style>
-</head>
-<body>
+import requests
+import json
+import os
+from datetime import datetime
 
-<header>
-  <h1>My GitHub Pages Website</h1>
-  <p>Welcome to my site 🚀</p>
-</header>
+# ========= CONFIG =========
+API_KEY = "your_api_key_here"
+API_URL = "https://api.openai.com/v1/chat/completions"
+MODEL = "gpt-4o-mini"
 
-<nav>
-  <a href="#home">Home</a>
-  <a href="#about">About</a>
-  <a href="#contact">Contact</a>
-</nav>
+MEMORY_FILE = "memory.json"
 
-<div class="container">
-  <section id="home" class="card">
-    <h2>Home</h2>
-    <p>This is my homepage. I built this using HTML, CSS, and JavaScript.</p>
-    <button onclick="showMessage()">Click Me</button>
-  </section>
+# ========= LOAD MEMORY =========
+def load_memory():
+    if os.path.exists(MEMORY_FILE):
+        with open(MEMORY_FILE, "r") as f:
+            return json.load(f)
+    else:
+        return [
+            {
+                "role": "system",
+                "content": "You are a smart, helpful, slightly witty AI assistant. Keep answers clear and useful."
+            }
+        ]
 
-  <section id="about" class="card">
-    <h2>About</h2>
-    <p>I am learning web development and hosting with GitHub Pages.</p>
-  </section>
+# ========= SAVE MEMORY =========
+def save_memory(memory):
+    with open(MEMORY_FILE, "w") as f:
+        json.dump(memory, f, indent=2)
 
-  <section id="contact" class="card">
-    <h2>Contact</h2>
-    <p>Email: example@email.com</p>
-  </section>
-</div>
+# ========= AI CALL =========
+def chat_with_ai(memory, user_input):
+    memory.append({"role": "user", "content": user_input})
 
-<footer>
-  <p>© 2026 My Website</p>
-</footer>
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
 
-<script>
-  function showMessage() {
-    alert("Thanks for clicking! 🎉");
-  }
-</script>
+    data = {
+        "model": MODEL,
+        "messages": memory,
+        "temperature": 0.7
+    }
 
-</body>
-</html>
+    try:
+        response = requests.post(API_URL, headers=headers, json=data)
+        result = response.json()
+
+        ai_reply = result["choices"][0]["message"]["content"]
+
+        memory.append({"role": "assistant", "content": ai_reply})
+        save_memory(memory)
+
+        return ai_reply
+
+    except Exception as e:
+        return f"[Error]: {e}"
+
+# ========= SIMPLE AGENT COMMANDS =========
+def handle_commands(user_input):
+    user_input = user_input.lower()
+
+    if user_input == "time":
+        return f"🕒 Current time: {datetime.now().strftime('%H:%M:%S')}"
+
+    if user_input == "date":
+        return f"📅 Today is: {datetime.now().strftime('%Y-%m-%d')}"
+
+    if user_input.startswith("remember "):
+        note = user_input.replace("remember ", "")
+        with open("notes.txt", "a") as f:
+            f.write(note + "\n")
+        return "✅ I saved that in notes."
+
+    if user_input == "notes":
+        if os.path.exists("notes.txt"):
+            with open("notes.txt", "r") as f:
+                return "🧠 Your notes:\n" + f.read()
+        return "No notes yet."
+
+    return None
+
+# ========= MAIN LOOP =========
+def run_agent():
+    memory = load_memory()
+
+    print("\n🤖 AI Agent Ready! Type 'exit' to quit.\n")
+
+    while True:
+        user_input = input("You: ")
+
+        if user_input.lower() == "exit":
+            print("AI: Goodbye 👋")
+            break
+
+        # Check commands first
+        command_response = handle_commands(user_input)
+        if command_response:
+            print("AI:", command_response)
+            continue
+
+        # Otherwise use AI
+        reply = chat_with_ai(memory, user_input)
+        print("AI:", reply)
+
+
+# ========= START =========
+if __name__ == "__main__":
+    run_agent()
